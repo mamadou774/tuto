@@ -1,0 +1,64 @@
+<?php
+require_once '../includes/config.php';
+protect_page();
+
+if (!is_admin()) {
+    header('Location: ../login.php');
+    exit();
+}
+
+require_once '../libs/tcpdf/tcpdf.php';
+
+// Créer un nouveau PDF
+$pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
+// Configuration du document
+$pdf->SetCreator(PDF_CREATOR);
+$pdf->SetAuthor('Gestion Notes');
+$pdf->SetTitle('Export des notes');
+$pdf->SetSubject('Notes des étudiants');
+
+// Ajouter une page
+$pdf->AddPage();
+
+// Titre
+$pdf->SetFont('helvetica', 'B', 16);
+$pdf->Cell(0, 10, 'Liste des notes des étudiants', 0, 1, 'C');
+
+// Récupérer les notes
+$query = $db->query("
+    SELECT e.matricule, e.nom, e.prenom, m.libelle as matiere, n.note, n.date_creation 
+    FROM notes n
+    JOIN etudiants e ON n.etudiant_id = e.id
+    JOIN matieres m ON n.matiere_id = m.id
+    ORDER BY e.nom, e.prenom, m.libelle
+");
+$notes = $query->fetchAll(PDO::FETCH_ASSOC);
+
+// Tableau des notes
+$pdf->SetFont('helvetica', '', 10);
+$html = '<table border="1">
+    <tr>
+        <th width="15%">Matricule</th>
+        <th width="20%">Étudiant</th>
+        <th width="30%">Matière</th>
+        <th width="10%">Note</th>
+        <th width="25%">Date</th>
+    </tr>';
+
+foreach ($notes as $note) {
+    $html .= '<tr>
+        <td>'.$note['matricule'].'</td>
+        <td>'.$note['nom'].' '.$note['prenom'].'</td>
+        <td>'.$note['matiere'].'</td>
+        <td>'.$note['note'].'</td>
+        <td>'.date('d/m/Y', strtotime($note['date_creation'])).'</td>
+    </tr>';
+}
+
+$html .= '</table>';
+$pdf->writeHTML($html, true, false, false, false, '');
+
+// Générer le PDF
+$pdf->Output('notes_etudiants.pdf', 'D');
+exit();
